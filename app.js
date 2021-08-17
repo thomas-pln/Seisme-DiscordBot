@@ -11,6 +11,7 @@ const interaction = '!quake';
 var timer = undefined; //minutes
 var interval = undefined;
 
+const flags = require('./data/flags.json');
 
 client.on("ready", () => {
   console.log('Successfully connected !')
@@ -216,23 +217,38 @@ async function sismicEvents(msg){
   for await(var nd of newData['features']){
     var isIn = false;
     var date = new Date(`${nd['properties']['time']}`);
+
+    //Récupération du pays à partir des coordonées (pour récuperer l'émoji flag correspondant)
+    const URL = `http://api.geonames.org/countryCodeJSON?lat=${nd['properties']['latitude']}&lng=${nd['properties']['longitude']}&username=${process.env.USERNAME}`;
+    var country = await new Promise((resolve, reject) =>{
+      request.get(URL, {}, (error, res, body)=>{
+          if (error) {
+              reject(error);
+          }else{
+              resolve(body);
+          }
+      });
+    });
+    country = JSON.parse(country);
+
+
     for(var od of oldData['features']){
-        if(nd['id'] === od['id'] && nd['properties']['automatic'] != od['properties']['automatic']){
-          //Evenement validé
-          isIn = true;
-          await msg.channel.send(`:boom: ${nd['properties']['description']['fr']}\n:alarm_clock: ${date.getDate()}-${date.getMonth()}-${date.getFullYear()} à ${date.getHours()}:${date.getMinutes()}\n:compass: Latitude ${nd['geometry']['coordinates'][1]} Longitude ${nd['geometry']['coordinates'][0]}\nVérifié: :white_check_mark:\n:computer: ${nd['properties']['url']['fr']}\n_______`);
-          break;  
-        }else if(nd['id'] === od['id'] && nd['properties']['automatic'] == od['properties']['automatic']){
-          //Evenement déjà affiché
-          isIn = true;
-          break;
-        }
+      if(nd['id'] === od['id'] && nd['properties']['automatic'] != od['properties']['automatic']){
+        //Evenement validé
+        isIn = true;
+        await msg.channel.send(`:boom: ${nd['properties']['description']['fr']} ${flags[country['countryCode']]}\n:alarm_clock: ${date.getDate()}-${date.getMonth()}-${date.getFullYear()} à ${date.getHours()}:${date.getMinutes()}\n:compass: Latitude ${nd['geometry']['coordinates'][1]} Longitude ${nd['geometry']['coordinates'][0]}\nVérifié: :white_check_mark:\n:computer: ${nd['properties']['url']['fr']}\n_______`);
+        break;  
+      }else if(nd['id'] === od['id'] && nd['properties']['automatic'] == od['properties']['automatic']){
+        //Evenement déjà affiché
+        isIn = true;
+        break;
+      }
     }
     if(!isIn){
       if(nd['properties']['automatic']){
-        await msg.channel.send(`:boom: ${nd['properties']['description']['fr']}\n:alarm_clock: ${date.getDate()}-${date.getMonth()}-${date.getFullYear()} à ${date.getHours()}:${date.getMinutes()}\n:compass: Latitude ${nd['geometry']['coordinates'][1]} Longitude ${nd['geometry']['coordinates'][0]}\nVérifié: ⌛ (en attente de validation) \n:computer: ${nd['properties']['url']['fr']}\n_______`);
+        await msg.channel.send(`:boom: ${nd['properties']['description']['fr']} ${flags[country['countryCode']]}\n:alarm_clock: ${date.getDate()}-${date.getMonth()}-${date.getFullYear()} à ${date.getHours()}:${date.getMinutes()}\n:compass: Latitude ${nd['geometry']['coordinates'][1]} Longitude ${nd['geometry']['coordinates'][0]}\nVérifié: ⌛ (en attente de validation) \n:computer: ${nd['properties']['url']['fr']}\n_______`);
       }else{
-        await msg.channel.send(`:boom: ${nd['properties']['description']['fr']}\n:alarm_clock: ${date.getDate()}-${date.getMonth()}-${date.getFullYear()} à ${date.getHours()}:${date.getMinutes()}\n:compass: Latitude ${nd['geometry']['coordinates'][1]} Longitude ${nd['geometry']['coordinates'][0]}\nVérifié: :white_check_mark:\n:computer: ${nd['properties']['url']['fr']}\n_______`);
+        await msg.channel.send(`:boom: ${nd['properties']['description']['fr']} ${flags[country['countryCode']]}\n:alarm_clock: ${date.getDate()}-${date.getMonth()}-${date.getFullYear()} à ${date.getHours()}:${date.getMinutes()}\n:compass: Latitude ${nd['geometry']['coordinates'][1]} Longitude ${nd['geometry']['coordinates'][0]}\nVérifié: :white_check_mark:\n:computer: ${nd['properties']['url']['fr']}\n_______`);
       }
     }
   }
