@@ -3,7 +3,7 @@ const fs = require('fs');
 
 const Discord = require('discord.js');
 const request = require('request');
-const { resolve } = require('path');
+const { debug } = require('console');
 
 const client = new Discord.Client({ intents: [Discord.Intents.FLAGS.GUILDS, Discord.Intents.FLAGS.GUILD_MESSAGES] });
 
@@ -21,7 +21,7 @@ client.on('messageCreate', async msg =>{
   if(msg.content.startsWith(interaction)){
 
     if(msg.content === `${interaction} config`){ //Les commandes de configuration
-      msg.channel.send(`Pour définir la zone d'évennement que le Bot affichera :\n\`${interaction} config area [latitude max] [longitude min] [longitude max] [latitude min]\`\nModifier la temps entre chaque requête : \n\`${interaction} config time [temps en minutes]\``);
+      msg.channel.send(`Définir la zone dans laquelle le bot cherchera les nouveaux événnements :\n\`${interaction} config area [latitude max] [longitude min] [longitude max] [latitude min]\`\nModifier la temps entre chaque requête : \n\`${interaction} config time [temps en minutes]\`\nAffichier les configuration courante :\n\`${interaction} config show\``);
     }else if(msg.content.startsWith(`${interaction} config area`)){ //Changer les coordonnées de la zone d'alert
       await configArea(msg);
     }else if (msg.content.startsWith(`${interaction} config time`)){ //Changer le temps entre chaque requête et verification
@@ -30,9 +30,8 @@ client.on('messageCreate', async msg =>{
       if(interval){
         await msg.channel.send(`Commande déjà en cours d'exécution`);
       }else{
-        interval = setInterval(()=>{
-          sismicEvents();
-        }, timer*60000);
+        await msg.channel.send(`Affichage des événnements lancé`);
+        start(msg);
       }
     }else if(msg.content === `${interaction} stop`){ //Stopper les alertes
       if(interval){
@@ -42,12 +41,42 @@ client.on('messageCreate', async msg =>{
       }else{
         await msg.channel.send('Affichage déjà stoppé.')
       }
-    }else if(msg.content === `${interaction} show config`){ //Affiche la configuration
+    }else if(msg.content === `${interaction} config show`){ //Affiche la configuration
       showConfig(msg);
+    }else if(msg.content === `${interaction} help`){
+      await help(msg);
+    }else{
+      await help(msg);
     }
 
   }
 });
+
+/**
+ * Lanceur de la boucle de vérification et d'affichage des événnements.
+ * @param {*} msg 
+ */
+async function start(msg){
+  var cconfig = await new Promise((resolve, reject)=>{
+    fs.readFile('./config.json', 'utf-8',(err, data)=>{
+      if(err){
+        reject(err);
+      }else{
+        resolve(data)
+      }
+    });
+  });
+
+  cconfig = JSON.parse(cconfig);
+  timer = cconfig['timer'];
+
+  interval = setInterval(()=>{
+    sismicEvents(msg);
+  }, timer*60000);
+}
+
+
+
 
 /**
  * Configuration de la zone où chercher les nouveaux événements sismiques.
@@ -90,7 +119,7 @@ const configArea = (msg)=>{
           console.log(`Error writing file: ${err}`);
           msg.channel.send(`Une erreur s'est produite, les modifications n'ont pas pu être enregistrées.`);
         }else{
-          msg.channel.send(`Les modifications ont pu être réalisées ☑ :\n➡latitude max :\`${coords[0]}\`\n➡longitude min :\`${coords[1]}\`\n➡longitude max :\`${coords[2]}\`\n➡latitude min :\`${coords[3]}\``)
+          msg.channel.send(`Les nouvelles coordonnées ont bien été prises en compte ☑:\n➡latitude max :\`${coords[0]}\`\n➡longitude min :\`${coords[1]}\`\n➡longitude max :\`${coords[2]}\`\n➡latitude min :\`${coords[3]}\``)
         }
       });
 
@@ -110,8 +139,8 @@ const configTimer = (msg)=>{
   }
 
   var newTime = Number.parseInt(split[3]);
-  if(isNaN(newTime)){
-    return msg.channel.send('La valeur doit être un nombre entier (en minute)');
+  if(isNaN(newTime) || newTime <5){
+    return msg.channel.send('La valeur doit être un nombre entier et supérieur ou égale à 5 minutes');
   }
 
   fs.readFile('./config.json', 'utf-8',(err, data)=>{
@@ -152,7 +181,7 @@ const getEvents =async() => {
   });
   cconfig = JSON.parse(cconfig);
   var date = new Date().toISOString().split('T')[0];
-  const URL = `https://api.franceseisme.fr/fdsnws/event/1/query?endtime=${date}T23:59:59.99Z&eventtype=building+collapse%2Cchemical+explosion%2Cearthquake%2Cexplosion%2Cinduced+or+triggered+event%2Clandslide%2Cnuclear+explosion%2Cother+event%2Cother+event%2Cquarry+blast%2Crockslide%2Csonic+boom&format=json&maxlatitude=${cconfig['area']['maximal_latitude']}&maxlongitude=${cconfig['area']['maximal_longitude']}&minlatitude=${cconfig['area']['minimal_latitude']}&minlongitude=${cconfig['area']['minimal_longitude']}&orderby=time&starttime=${date}T00:00:00Z`;
+  const URL = `https://api.franceseisme.fr/fdsnws/event/1/query?endtime=${date}T23:59:59.999999Z&format=json&maxlatitude=${cconfig['area']['maximal_latitude']}&maxlongitude=${cconfig['area']['maximal_longitude']}&minlatitude=${cconfig['area']['minimal_latitude']}&minlongitude=${cconfig['area']['minimal_longitude']}&orderby=time&starttime=${date}T00:00:00Z`;
   return new Promise((resolve, reject) =>{
     request.get(URL, {}, (error, res, body)=>{
         if (error) {
@@ -169,7 +198,7 @@ const getEvents =async() => {
  * ainsi que ceux qui n'étaient pas validés lors de la vérification précédente.
  * Ecrase les anciennes données avec les nouvelles.
  */
-async function sismicEvents(){
+async function sismicEvents(msg){
   var oldData = await new Promise((resolve, reject)=>{
     fs.readFile('./data/data.json', 'utf-8',(err, data)=>{
       if(err){
@@ -181,29 +210,34 @@ async function sismicEvents(){
   })
   newData = await getEvents();
   newData = JSON.parse(newData);
-  oldData = JSON.parse(oldData);
+  oldData = JSON.parse(oldData);  
 
-  newData['features'].forEach(nd => {
+
+  for await(var nd of newData['features']){
     var isIn = false;
-    for(const od of oldData['features']){
+    var date = new Date(`${nd['properties']['time']}`);
+    for(var od of oldData['features']){
         if(nd['id'] === od['id'] && nd['properties']['automatic'] != od['properties']['automatic']){
-            //Evennement validé
-            isIn =true;
-            let date = new Date(nd['description']['time']);
-            channel.send(`:boom: ${nd['description']['fr']}\n:alarm_clock: ${date.getDate()}-${date.getMonth()}-${date.getFullYear()} à ${date.getHours()}:${date.getMinutes()}\n:compass: Latitude ${nd['geometry']['coordinates'][1]} Longitude ${nd['geometry']['coordinates'][0]}\nVérifié: :white_check_mark:\n:computer: ${nd['description']['url']['fr']}`);
-            break;
-        }else if(nd['id'] === od['id'] && nd['properties']['automatic'] === od['properties']['automatic']){
-            //Evennement déjà affiché
-            isIn = true;
-            break;
+          //Evennement validé
+          isIn = true;
+          await msg.channel.send(`:boom: ${nd['properties']['description']['fr']}\n:alarm_clock: ${date.getDate()}-${date.getMonth()}-${date.getFullYear()} à ${date.getHours()}:${date.getMinutes()}\n:compass: Latitude ${nd['geometry']['coordinates'][1]} Longitude ${nd['geometry']['coordinates'][0]}\nVérifié: :white_check_mark:\n:computer: ${nd['properties']['url']['fr']}\n_______`);
+          break;  
+        }else if(nd['id'] === od['id'] && nd['properties']['automatic'] == od['properties']['automatic']){
+          //Evennement déjà affiché
+          isIn = true;
+          break;
         }
     }
     if(!isIn){
-      channel.send(`:boom: ${nd['description']['fr']}\n:alarm_clock: ${date.getDate()}-${date.getMonth()}-${date.getFullYear()} à ${date.getHours()}:${date.getMinutes()}\n:compass: Latitude ${nd['geometry']['coordinates'][1]} Longitude ${nd['geometry']['coordinates'][0]}\nVérifié: ⌛\n:computer: ${nd['description']['url']['fr']}`);
+      if(nd['properties']['automatic']){
+        await msg.channel.send(`:boom: ${nd['properties']['description']['fr']}\n:alarm_clock: ${date.getDate()}-${date.getMonth()}-${date.getFullYear()} à ${date.getHours()}:${date.getMinutes()}\n:compass: Latitude ${nd['geometry']['coordinates'][1]} Longitude ${nd['geometry']['coordinates'][0]}\nVérifié: ⌛ (en attente de validation) \n:computer: ${nd['properties']['url']['fr']}\n_______`);
+      }else{
+        await msg.channel.send(`:boom: ${nd['properties']['description']['fr']}\n:alarm_clock: ${date.getDate()}-${date.getMonth()}-${date.getFullYear()} à ${date.getHours()}:${date.getMinutes()}\n:compass: Latitude ${nd['geometry']['coordinates'][1]} Longitude ${nd['geometry']['coordinates'][0]}\nVérifié: :white_check_mark:\n:computer: ${nd['properties']['url']['fr']}\n_______`);
+      }
     }
-  });
+  }
   var updateFile = JSON.stringify(newData);
-  fs.writeFile('./data/data.json', updateFile, 'utf8', (err)=>{
+  await fs.writeFile('./data/data.json', updateFile, 'utf8', (err)=>{
     if(err){
       console.log(`Error writing file: ${err}`);
     }
@@ -227,5 +261,11 @@ const showConfig = async (msg)=>{
   var cconfig = JSON.parse(promise);
   msg.channel.send(`⬆Latitude max: \`${cconfig['area']['maximal_latitude']}\`\n⬅Longitude min: \`${cconfig['area']['minimal_longitude']}\`\n➡Longitude max: \`${cconfig['area']['maximal_longitude']}\`\n⬇Latitude min: \`${cconfig['area']['minimal_latitude']}\`\n⌛Timer: \`${cconfig['timer']}\` minutes`);
 }
+
+
+const help = msg =>{
+  msg.channel.send(`Commandes :\n \`${interaction} help\`: liste des commandes,\n \`${interaction} config\`: liste des commandes de configuration,\n \`${interaction} config show\`: affiche la configuration courante,\n \`${interaction} start\`: lancer la boucle des événnements,\n \`${interaction} stop\`: arrêter la boucle des événnements`);
+}
+
 
 client.login(process.env.TOKEN);
