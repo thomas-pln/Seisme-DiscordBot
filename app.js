@@ -21,7 +21,7 @@ client.on('messageCreate', async msg =>{
   if(msg.content.startsWith(interaction)){
 
     if(msg.content === `${interaction} config`){ //Les commandes de configuration
-      msg.channel.send(`Définir la zone dans laquelle le bot cherchera les nouveaux événnements :\n\`${interaction} config area [latitude max] [longitude min] [longitude max] [latitude min]\`\nModifier la temps entre chaque requête : \n\`${interaction} config time [temps en minutes]\`\nAffichier les configuration courante :\n\`${interaction} config show\``);
+      msg.channel.send(`Définir la zone dans laquelle le bot cherchera les nouveaux événements :\n\`${interaction} config area [latitude max] [longitude min] [longitude max] [latitude min]\`\nModifier la temps entre chaque requête : \n\`${interaction} config time [temps en minutes]\`\nAffichier les configuration courante :\n\`${interaction} config show\``);
     }else if(msg.content.startsWith(`${interaction} config area`)){ //Changer les coordonnées de la zone d'alert
       await configArea(msg);
     }else if (msg.content.startsWith(`${interaction} config time`)){ //Changer le temps entre chaque requête et verification
@@ -30,13 +30,13 @@ client.on('messageCreate', async msg =>{
       if(interval){
         await msg.channel.send(`Commande déjà en cours d'exécution`);
       }else{
-        await msg.channel.send(`Affichage des événnements lancé`);
+        await msg.channel.send(`Affichage des événements lancé`);
         start(msg);
       }
     }else if(msg.content === `${interaction} stop`){ //Stopper les alertes
       if(interval){
         clearInterval(interval);
-        await msg.channel.send('Affichage des événnements stoppé.')
+        await msg.channel.send('Affichage des événements stoppé.')
         interval = undefined;
       }else{
         await msg.channel.send('Affichage déjà stoppé.')
@@ -53,7 +53,7 @@ client.on('messageCreate', async msg =>{
 });
 
 /**
- * Lanceur de la boucle de vérification et d'affichage des événnements.
+ * Lanceur de la boucle de vérification et d'affichage des événements.
  * @param {*} msg 
  */
 async function start(msg){
@@ -157,7 +157,7 @@ const configTimer = (msg)=>{
           msg.channel.send(`Une erreur s'est produite, les modifications n'ont pas pu être enregistrées.`);
         }else{
           clearInterval(interval);
-          msg.channel.send(`Le timer a bien été modifié : ${newTime} ⏳\nLa commande \`!quake start\` est requise pour relancer l'affichage des évennements.`);
+          msg.channel.send(`Le timer a bien été modifié : ${newTime} ⏳\nLa commande \`!quake start\` est requise pour relancer l'affichage des évenements.`);
           interval = undefined;
         }
       })
@@ -194,7 +194,7 @@ const getEvents =async() => {
 }
 
 /**
- * Affiche tous les nouveaux évennements ne se trouvant pas dans ./data/data.json 
+ * Affiche tous les nouveaux évenements ne se trouvant pas dans ./data/data.json 
  * ainsi que ceux qui n'étaient pas validés lors de la vérification précédente.
  * Ecrase les anciennes données avec les nouvelles.
  */
@@ -218,12 +218,12 @@ async function sismicEvents(msg){
     var date = new Date(`${nd['properties']['time']}`);
     for(var od of oldData['features']){
         if(nd['id'] === od['id'] && nd['properties']['automatic'] != od['properties']['automatic']){
-          //Evennement validé
+          //Evenement validé
           isIn = true;
           await msg.channel.send(`:boom: ${nd['properties']['description']['fr']}\n:alarm_clock: ${date.getDate()}-${date.getMonth()}-${date.getFullYear()} à ${date.getHours()}:${date.getMinutes()}\n:compass: Latitude ${nd['geometry']['coordinates'][1]} Longitude ${nd['geometry']['coordinates'][0]}\nVérifié: :white_check_mark:\n:computer: ${nd['properties']['url']['fr']}\n_______`);
           break;  
         }else if(nd['id'] === od['id'] && nd['properties']['automatic'] == od['properties']['automatic']){
-          //Evennement déjà affiché
+          //Evenement déjà affiché
           isIn = true;
           break;
         }
@@ -264,7 +264,7 @@ const showConfig = async (msg)=>{
 
 
 const help = msg =>{
-  msg.channel.send(`Commandes :\n \`${interaction} help\`: liste des commandes,\n \`${interaction} config\`: liste des commandes de configuration,\n \`${interaction} config show\`: affiche la configuration courante,\n \`${interaction} start\`: lancer la boucle des événnements,\n \`${interaction} stop\`: arrêter la boucle des événnements`);
+  msg.channel.send(`Commandes :\n \`${interaction} help\`: liste des commandes,\n \`${interaction} config\`: liste des commandes de configuration,\n \`${interaction} config show\`: affiche la configuration courante,\n \`${interaction} start\`: lancer la boucle des événements,\n \`${interaction} stop\`: arrêter la boucle des événements`);
 }
 
 
